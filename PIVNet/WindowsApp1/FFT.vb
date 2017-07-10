@@ -192,7 +192,6 @@
     End Sub
 
 
-
     Public Function DFT(InputData() As ComplexDouble) As ComplexDouble()
         'Implements a regular (slow) DFT.
 
@@ -225,50 +224,9 @@
         Next
         Return DFTResult
     End Function
-#End Region
 
-#Region "Filtering"
-    Public Function GaussianBlur(Sigma As Double, OriginalImage As ComplexDouble(,)) As ComplexDouble(,)
-        'Generates an array of ComplexDouble for the convolution of a gaussian filter
-        'OriginalImage is an array (the image) that will be the recipient of the convolution operation.
-
-        Dim ImageFFT(,) As ComplexDouble = FFT_2D(OriginalImage, 1)
-
-        'Makes the gaussian mask
-        Dim GaussianMask(,) As ComplexDouble
-        ReDim GaussianMask(UBound(ImageFFT, 1), UBound(ImageFFT, 2))
-        Dim Cutoff As Double = 0.00001
-
-        For X As Integer = 0 To UBound(ImageFFT, 1)
-            For Y As Integer = 0 To UBound(ImageFFT, 2)
-                GaussianMask(X, Y) = New ComplexDouble(Math.Exp((-(X * X) - (Y * Y)) / (2 * Sigma * Sigma)) / (2 * Math.PI * Sigma * Sigma),
-                                                       0)
-            Next
-        Next
-
-        'Multiplies the FFTs (Convolves) and then takes the inverse FFT
-        Dim ResultImage(,) As ComplexDouble
-        ResultImage = FFT_2D(GaussianMask, 1)
-        ResultImage = MultiplyMatrices(ResultImage, ImageFFT)
-        ResultImage = FFT_2D(ResultImage, -1)
-
-        Return ResultImage
-    End Function
-
-    Public Function MultiplyMatrices(M1(,) As ComplexDouble, M2(,) As ComplexDouble) As ComplexDouble(,)
-        'Multiplication term by term.
-        If Not (UBound(M1, 1) = UBound(M2, 1) AndAlso UBound(M1, 2) = UBound(M2, 2)) Then Return Nothing 'Makes sure the sizes are equal
-
-        Dim Result(,) As ComplexDouble
-        ReDim Result(UBound(M1, 1), UBound(M1, 2))
-        For X As Integer = 0 To UBound(M1, 1)
-            For Y As Integer = 0 To UBound(M1, 2)
-                Result(X, Y) = M1(X, Y) * M2(X, Y)
-            Next
-        Next
-
-        Return Result
-    End Function
 
 #End Region
+
+
 End Module
