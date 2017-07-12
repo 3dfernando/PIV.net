@@ -26,9 +26,12 @@ Partial Class Main
         Me.FFTPicture = New System.Windows.Forms.PictureBox()
         Me.OpenFile = New System.Windows.Forms.OpenFileDialog()
         Me.CorrelationImage = New System.Windows.Forms.PictureBox()
+        Me.ColorBox = New System.Windows.Forms.PictureBox()
+        Me.ValueLabel = New System.Windows.Forms.Label()
         CType(Me.OriginalPicture, System.ComponentModel.ISupportInitialize).BeginInit()
         CType(Me.FFTPicture, System.ComponentModel.ISupportInitialize).BeginInit()
         CType(Me.CorrelationImage, System.ComponentModel.ISupportInitialize).BeginInit()
+        CType(Me.ColorBox, System.ComponentModel.ISupportInitialize).BeginInit()
         Me.SuspendLayout()
         '
         'OriginalPicture
@@ -62,11 +65,31 @@ Partial Class Main
         Me.CorrelationImage.TabIndex = 6
         Me.CorrelationImage.TabStop = False
         '
+        'ColorBox
+        '
+        Me.ColorBox.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle
+        Me.ColorBox.Location = New System.Drawing.Point(1051, 12)
+        Me.ColorBox.Name = "ColorBox"
+        Me.ColorBox.Size = New System.Drawing.Size(46, 41)
+        Me.ColorBox.TabIndex = 7
+        Me.ColorBox.TabStop = False
+        '
+        'ValueLabel
+        '
+        Me.ValueLabel.AutoSize = True
+        Me.ValueLabel.Location = New System.Drawing.Point(1051, 56)
+        Me.ValueLabel.Name = "ValueLabel"
+        Me.ValueLabel.Size = New System.Drawing.Size(16, 13)
+        Me.ValueLabel.TabIndex = 8
+        Me.ValueLabel.Text = "   "
+        '
         'Main
         '
         Me.AutoScaleDimensions = New System.Drawing.SizeF(6.0!, 13.0!)
         Me.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font
         Me.ClientSize = New System.Drawing.Size(1189, 914)
+        Me.Controls.Add(Me.ValueLabel)
+        Me.Controls.Add(Me.ColorBox)
         Me.Controls.Add(Me.CorrelationImage)
         Me.Controls.Add(Me.FFTPicture)
         Me.Controls.Add(Me.OriginalPicture)
@@ -75,11 +98,15 @@ Partial Class Main
         CType(Me.OriginalPicture, System.ComponentModel.ISupportInitialize).EndInit()
         CType(Me.FFTPicture, System.ComponentModel.ISupportInitialize).EndInit()
         CType(Me.CorrelationImage, System.ComponentModel.ISupportInitialize).EndInit()
+        CType(Me.ColorBox, System.ComponentModel.ISupportInitialize).EndInit()
         Me.ResumeLayout(False)
+        Me.PerformLayout()
 
     End Sub
     Friend WithEvents OriginalPicture As PictureBox
     Friend WithEvents FFTPicture As PictureBox
     Friend WithEvents OpenFile As OpenFileDialog
     Friend WithEvents CorrelationImage As PictureBox
+    Friend WithEvents ColorBox As PictureBox
+    Friend WithEvents ValueLabel As Label
 End Class

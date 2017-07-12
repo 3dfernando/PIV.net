@@ -1,6 +1,7 @@
 ﻿Public Class Main
+    Public CrossCorrelatedArray(,) As ComplexDouble
 
-    Private Sub OriginalPicture_Click(sender As Object, e As EventArgs) Handles OriginalPicture.Click
+    Private Sub OriginalPicture_MouseClick(sender As Object, e As MouseEventArgs) Handles OriginalPicture.MouseClick
         'Opens a picture
         OpenFile.ShowDialog()
         If System.IO.File.Exists(OpenFile.FileName) Then
@@ -14,22 +15,27 @@
 
                 Dim OriginalComplexArray(,) As ComplexDouble = BitmapToComplexArray(OriginalBMP)
                 Dim SmallWindow(,) As ComplexDouble
-                Dim WindowSize As Integer = 20
+                Dim WindowSize As Integer = 100
                 ReDim SmallWindow(WindowSize - 1, WindowSize - 1)
-                Dim DX As Integer = 100
-                Dim DY As Integer = 30
+                Dim DX As Integer = e.X - Int(WindowSize / 2)
+                Dim DY As Integer = e.Y - Int(WindowSize / 2)
+
+                If DX < 0 Then DX = 0
+                If DX > OriginalBMP.Width - WindowSize Then DX = OriginalBMP.Width - WindowSize
+                If DY < 0 Then DY = 0
+                If DY > OriginalBMP.Height - WindowSize Then DY = OriginalBMP.Height - WindowSize
+
+
                 For X = 0 To WindowSize - 1
                     For Y = 0 To WindowSize - 1
                         SmallWindow(X, Y) = OriginalComplexArray(X + DX, Y + DY)
                     Next
                 Next
 
+                CrossCorrelatedArray = NormalizedCrossCorrelation(OriginalComplexArray, SmallWindow)
+                CrossCorrelatedArray = BorderRemoval(CrossCorrelatedArray, WindowSize)
 
-                Dim NormXCorrelated(,) As ComplexDouble = NormalizedCrossCorrelation(OriginalComplexArray, SmallWindow)
-
-                Dim NewBMP As Bitmap = ComplexArrayToBitmap(NormXCorrelated)
-
-
+                Dim NewBMP As Bitmap = ComplexArrayToBitmap(CrossCorrelatedArray)
 
                 OriginalPicture.Image = OriginalBMP
                 'OriginalPicture.Image = New Bitmap(OriginalBMP, OriginalPicture.Size)
@@ -47,6 +53,21 @@
             End Try
         End If
     End Sub
+
+    Private Sub FFTPicture_MouseClick(sender As Object, e As MouseEventArgs) Handles FFTPicture.MouseClick
+        'Displays the correlation value
+
+        Try
+            Dim Max As Double = MaximumValue(CrossCorrelatedArray)
+            ValueLabel.Text = Int(CrossCorrelatedArray(e.X - 1, e.Y - 1).Real * 10000 / Max) / 100 & "%"
+            ColorBox.BackColor = New Bitmap(FFTPicture.Image).GetPixel(e.X - 1, e.Y - 1)
+        Catch ex As Exception
+
+        End Try
+
+    End Sub
+
+
 
 #Region "Picture Display"
     Public Function BitmapToComplexArray(Bmp As Bitmap) As ComplexDouble(,)
@@ -265,6 +286,8 @@
         End If
 
     End Function
+
+
 
 #End Region
 

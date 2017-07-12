@@ -11,20 +11,20 @@
         If UBound(SearchWindow, 1) < UBound(Template, 1) Or UBound(SearchWindow, 2) < UBound(Template, 2) Then Return Nothing
 
         'Calculates the elements for the norm X corr:
-        'C=Conv_s-t/(std_t*conv_std_b) // Review presentation I made for Mechops
-        Dim Conv_s_t(,) As ComplexDouble
-        Dim std_t As Double
-        Dim Conv_std_b(,) As ComplexDouble
+        'C=Num/(DenA*DenB) // Review presentation I made for Mechops
+        Dim Num(,) As ComplexDouble
+        Dim DenA As Double
+        Dim DenB(,) As ComplexDouble
 
         Dim SW_NoAverage(,) As ComplexDouble = AddConstant(SearchWindow, (-1) * Avg(SearchWindow))
         Dim Tmp_NoAverage(,) As ComplexDouble = AddConstant(Template, (-1) * Avg(Template))
 
-        Conv_s_t = Convolve2D(SW_NoAverage, Tmp_NoAverage)
-        std_t = StdDev(Template)
+        Num = Convolve2D(SW_NoAverage, Tmp_NoAverage)
+        DenA = StdDev(Template)
 
 
-        'Conv_std_b is harder:
-        'Conv_std_b=(N-1)*sqrt(Conv_s_w-(Conv_s_w²/N))
+        'DenB is harder:
+        'DenB=(N-1)*sqrt(Conv_s_w-(Conv_s_w²/N))
         Dim W(,) As ComplexDouble 'W is the moving window. It is a full array of ones, of the size of the template.
         ReDim W(UBound(Template, 1), UBound(Template, 2))
         Dim Conv_s2_w(,) As ComplexDouble
@@ -42,19 +42,38 @@
         Conv_s_w_2 = Convolve2D(SearchWindow, W)
         Conv_s_w_2 = MultiplyMatrices(Conv_s_w_2, Conv_s_w_2) 'Squared version after convolving
 
-        'Makes Conv_std_b
-        Conv_std_b = MultiplyByConstant(Conv_s_w_2, 1 / N)
-        Conv_std_b = SubtractMatrices(Conv_s2_w, Conv_std_b)
-        Conv_std_b = MultiplyByConstant(Conv_std_b, N - 1)
-        Conv_std_b = SquareRootMatrix(Conv_std_b)
+        'Makes DenB
+        DenB = MultiplyByConstant(Conv_s_w_2, 1 / N)
+        DenB = SubtractMatrices(Conv_s2_w, DenB)
+        DenB = MultiplyByConstant(DenB, N - 1)
+        DenB = SquareRootMatrix(DenB)
 
         'Now makes the whole thing
         Dim C(,) As ComplexDouble
-        C = MultiplyByConstant(Conv_std_b, std_t)
-        C = DivideMatrices(Conv_s_t, C)
+        C = MultiplyByConstant(DenB, DenA)
+        C = DivideMatrices(Num, C)
 
         Return C
 
+    End Function
+
+    Public Function BorderRemoval(M(,) As ComplexDouble, BorderWidth As Integer) As ComplexDouble(,)
+        'Removes a border from the array M (border=0), to make sure no peaks are outside the relevant search area (out of bounds)
+
+        Dim ResultArray(,) As ComplexDouble
+        ReDim ResultArray(UBound(M, 1), UBound(M, 2))
+
+        For X = 0 To UBound(M, 1)
+            For Y = 0 To UBound(M, 2)
+                If (X < (BorderWidth / 2 - 1)) Or (Y < (BorderWidth / 2 - 1)) Or (X > (UBound(M, 1) - BorderWidth / 2)) Or (Y > (UBound(M, 2) - BorderWidth / 2)) Then
+                    ResultArray(X, Y) = New ComplexDouble(0, 0)
+                Else
+                    ResultArray(X, Y) = M(X, Y)
+                End If
+            Next
+        Next
+
+        Return ResultArray
     End Function
 #End Region
 
@@ -99,8 +118,8 @@
         Dim FFT_SizeW As Integer = 2 ^ closestLargerPowerOf2(W1 + W2)
         Dim FFT_SizeH As Integer = 2 ^ closestLargerPowerOf2(H1 + H2)
 
-        Dim N_Op_FFT As Integer = 3 * 2 * FFT_SizeH * FFT_SizeW * Math.Ceiling((Math.Log(FFT_SizeW) + Math.Log(FFT_SizeH)) / Math.Log(2)) 'Operations to make the 2D FFT. *3=3 FFTs (2 direct, 1 inverse) and *2=1add+1mult per loop in the FFT
-        Dim N_Op_Direct As Integer = 2 * W1 * W2 * H1 * H2
+        Dim N_Op_FFT As Double = 3 * 2 * FFT_SizeH * FFT_SizeW * Math.Ceiling((Math.Log(FFT_SizeW) + Math.Log(FFT_SizeH)) / Math.Log(2)) 'Operations to make the 2D FFT. *3=3 FFTs (2 direct, 1 inverse) and *2=1add+1mult per loop in the FFT
+        Dim N_Op_Direct As Double = 2.0 * W1 * W2 * H1 * H2
 
         If N_Op_FFT <= N_Op_Direct Then
             Return Convolve2D_FFT(M1, M2)
@@ -129,6 +148,8 @@
         ReDim M2Used(W1 + W2 - 1, H1 + H2 - 1)
 
         Dim X_Original, Y_Original As Integer
+        Dim M2_180(,) As ComplexDouble = Rot180(M2)
+
 
         'Zero-pads the arrays
         For X = 0 To W1 + W2 - 1
@@ -154,7 +175,7 @@
 
                 If (X_Original >= 0 And Y_Original >= 0 And X_Original < W2 And Y_Original < H2) Then
                     'It's inside bounds
-                    M2Used(X, Y) = M2(X_Original, Y_Original)
+                    M2Used(X, Y) = M2_180(X_Original, Y_Original)
                 Else
                     'Zero pad
                     M2Used(X, Y) = New ComplexDouble(0, 0)
@@ -203,6 +224,31 @@
         Next
 
         Return Sum / ((UBound(M, 1) + 1) * (UBound(M, 2) + 1))
+    End Function
+
+    Public Function MaximumValue(M(,) As ComplexDouble) As Double
+        'Returns the maximum value in the array
+        Dim Max As Double = Double.MinValue
+        For X As Integer = 0 To UBound(M, 1)
+            For Y As Integer = 0 To UBound(M, 2)
+                If Max < M(X, Y).Real Then Max = M(X, Y).Real
+            Next
+        Next
+
+        MaximumValue = Max
+    End Function
+
+    Public Function Rot180(M(,) As ComplexDouble) As ComplexDouble(,)
+        'Returns the array M rotated 180 degrees
+        Dim ReturnArray(,) As ComplexDouble
+        ReDim ReturnArray(UBound(M, 1), UBound(M, 2))
+
+        For X As Integer = 0 To UBound(M, 1)
+            For Y As Integer = 0 To UBound(M, 1)
+                ReturnArray(UBound(M, 1) - X, UBound(M, 2) - Y) = M(X, Y)
+            Next
+        Next
+        Return ReturnArray
     End Function
 
 #End Region
