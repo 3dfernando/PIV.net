@@ -99,6 +99,12 @@
       <DesignTimeSharedInput>True</DesignTimeSharedInput>
     </Compile>
     <Compile Include="NormXCorr.vb" />
+    <Compile Include="PictureDebug.Designer.vb">
+      <DependentUpon>PictureDebug.vb</DependentUpon>
+    </Compile>
+    <Compile Include="PictureDebug.vb">
+      <SubType>Form</SubType>
+    </Compile>
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Main.resx">
@@ -109,6 +115,9 @@
       <LastGenOutput>Resources.Designer.vb</LastGenOutput>
       <CustomToolNamespace>My.Resources</CustomToolNamespace>
       <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="PictureDebug.resx">
+      <DependentUpon>PictureDebug.vb</DependentUpon>
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>

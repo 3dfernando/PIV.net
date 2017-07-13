@@ -1,6 +1,52 @@
 ﻿Public Class Main
     Public CrossCorrelatedArray(,) As ComplexDouble
 
+
+
+    Private Sub cmdImg_Click(sender As Object, e As EventArgs) Handles cmdImg.Click
+        Dim ImageA, ImageB As Bitmap
+
+        'First image
+        OpenFile.ShowDialog()
+        If System.IO.File.Exists(OpenFile.FileName) Then
+            Try
+                'Tries to open the file
+                ImageA = New Bitmap(New Bitmap(OpenFile.FileName))
+            Catch
+                MsgBox("Couldn't load it")
+                Exit Sub
+            End Try
+        End If
+
+        'Second image
+        OpenFile.ShowDialog()
+        If System.IO.File.Exists(OpenFile.FileName) Then
+            Try
+                'Tries to open the file
+                ImageB = New Bitmap(New Bitmap(OpenFile.FileName))
+            Catch
+                MsgBox("Couldn't load it")
+                Exit Sub
+            End Try
+        End If
+
+        Dim VectorSpacing As Point
+        Dim VectorField(,) As VectorDisplacement = DisplacementVectorField(ImageA, ImageB, New Point(Val(MaxDisp), MaxDisp(MaxDisp)),
+                                                                           New Drawing.Size(Val(txtWindowSize), Val(txtWindowSize)),
+                                                                           New Drawing.Size(Val(NGrid), Val(NGrid)),
+                                                                           VectorSpacing)
+
+
+
+
+        OriginalPicture.Image = DrawVectorFieldOntoBMP(ImageA, VectorField, 5, Color.Red, True, Color.LightGray)
+        DisplacedPicture.Image = ImageB
+
+
+
+
+    End Sub
+
     Private Sub OriginalPicture_MouseClick(sender As Object, e As MouseEventArgs) Handles OriginalPicture.MouseClick
         'Opens a picture
         OpenFile.ShowDialog()
@@ -40,7 +86,7 @@
                 OriginalPicture.Image = OriginalBMP
                 'OriginalPicture.Image = New Bitmap(OriginalBMP, OriginalPicture.Size)
 
-                FFTPicture.Image = NewBMP
+                DisplacedPicture.Image = NewBMP
                 'FFTPicture.Image = New Bitmap(NewBMP, FFTPicture.Size)
 
                 CorrelationImage.Image = ComplexArrayToBitmap(SmallWindow)
@@ -54,13 +100,13 @@
         End If
     End Sub
 
-    Private Sub FFTPicture_MouseClick(sender As Object, e As MouseEventArgs) Handles FFTPicture.MouseClick
+    Private Sub FFTPicture_MouseClick(sender As Object, e As MouseEventArgs) Handles DisplacedPicture.MouseClick
         'Displays the correlation value
 
         Try
             Dim Max As Double = MaximumValue(CrossCorrelatedArray)
             ValueLabel.Text = Int(CrossCorrelatedArray(e.X - 1, e.Y - 1).Real * 10000 / Max) / 100 & "%"
-            ColorBox.BackColor = New Bitmap(FFTPicture.Image).GetPixel(e.X - 1, e.Y - 1)
+            ColorBox.BackColor = New Bitmap(DisplacedPicture.Image).GetPixel(e.X - 1, e.Y - 1)
         Catch ex As Exception
 
         End Try
@@ -69,59 +115,6 @@
 
 
 
-#Region "Picture Display"
-    Public Function BitmapToComplexArray(Bmp As Bitmap) As ComplexDouble(,)
-        'Converts a bitmap image into a complex number array
-        Dim ResultArray(,) As ComplexDouble
-        Dim Intensity As Double
-        ReDim ResultArray(Bmp.Width - 1, Bmp.Height - 1)
-
-        For X As Integer = 0 To Bmp.Width - 1
-            For Y As Integer = 0 To Bmp.Height - 1
-                Intensity = Bmp.GetPixel(X, Y).GetBrightness
-                ResultArray(X, Y) = New ComplexDouble(Intensity, 0)
-            Next
-        Next
-
-        Return ResultArray
-    End Function
-
-    Public Function ComplexArrayToBitmap(CArray(,) As ComplexDouble) As Bitmap
-        'Converts a bitmap image into a complex number array
-        Dim SizeX As Integer = UBound(CArray, 1) + 1
-        Dim SizeY As Integer = UBound(CArray, 2) + 1
-        Dim ResultBmp As New Bitmap(SizeX, SizeY)
-        Dim NormalizedIntensity As Double
-        Dim GrayscaleLevel As Integer
-        Dim M As Double
-        Dim MinimumMagnitude As Double = Double.MaxValue
-        Dim MaximumMagnitude As Double = Double.MinValue
-
-        For X As Integer = 0 To SizeX - 1
-            For Y As Integer = 0 To SizeY - 1
-                M = CArray(X, Y).Real
-                If MaximumMagnitude < M Then MaximumMagnitude = M
-                If MinimumMagnitude > M Then MinimumMagnitude = M
-            Next
-        Next
-
-        For X As Integer = 0 To SizeX - 1
-            For Y As Integer = 0 To SizeY - 1
-                If CArray(X, Y).Real = MaximumMagnitude Then
-                    ResultBmp.SetPixel(X, Y, Color.Red)
-                Else
-                    NormalizedIntensity = (CArray(X, Y).Real - MinimumMagnitude) / (MaximumMagnitude - MinimumMagnitude)
-                    GrayscaleLevel = Int(NormalizedIntensity * 255)
-
-                    ResultBmp.SetPixel(X, Y, Color.FromArgb(GrayscaleLevel, GrayscaleLevel, GrayscaleLevel))
-                End If
-            Next
-        Next
-
-        Return ResultBmp
-    End Function
-
-#End Region
 
 #Region "Chart Display"
 
@@ -289,6 +282,10 @@
 
 
 
+
 #End Region
 
+#Region "Garbage that pops up automatically"
+
+#End Region
 End Class

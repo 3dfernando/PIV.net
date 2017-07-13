@@ -151,7 +151,7 @@
     End Function
 
 
-    Public Function closestLargerPowerOf2(Number As Integer) As Integer
+    Public Function ClosestLargerPowerOf2(Number As Integer) As Integer
         'Returns the closest power of 2 that is larger than this number
         Dim ShiftedNumber As Integer = Number
         Dim Power As Integer = 0

@@ -1,7 +1,114 @@
 ﻿Module NormXCorr
     'Implements functions needed for performing normalized cross correlations
 
+#Region "Image Pair Comparison"
+
+    Public Function DisplacementVectorField(ImgA As Bitmap, ImgB As Bitmap, MaxVectorDisplacement As Point, WindowSize As Size, GridSize As Size, ByRef Spacing As Point) As VectorDisplacement(,)
+        'Generates the displacement vector field, given two images.
+        Dim ResultingVectors(,) As VectorDisplacement
+        ReDim ResultingVectors(GridSize.Width - 1, GridSize.Height - 1)
+
+        If Not ImgA.Size = ImgB.Size Then Return Nothing
+
+        'Makes complexdouble correspondents for each image
+        Dim ImgArrayA(,) As ComplexDouble = BitmapToComplexArray(ImgA)
+        Dim ImgArrayB(,) As ComplexDouble = BitmapToComplexArray(ImgB)
+
+
+        'Rounds up the window size to the highest even number to avoid half-pixels
+        If WindowSize.Height Mod 2 <> 0 Then WindowSize.Height = Math.Ceiling(WindowSize.Height / 2) * 2
+        If WindowSize.Width Mod 2 <> 0 Then WindowSize.Width = Math.Ceiling(WindowSize.Width / 2) * 2
+
+        Dim InterrogationWindowSize As New Size(WindowSize.Height + MaxVectorDisplacement.X * 2, WindowSize.Width + MaxVectorDisplacement.Y * 2)
+
+        Spacing = New Point((ImgA.Width - InterrogationWindowSize.Width) / (GridSize.Width - 1), (ImgA.Height - InterrogationWindowSize.Height) / (GridSize.Height - 1)) 'Outputs the spacing of the grid points
+
+
+        For GridX As Integer = 0 To GridSize.Width - 1
+            For GridY As Integer = 0 To GridSize.Height - 1
+                'Calculates the pixel centre for this grid point and rounds it (the pixel center won't be / shouldn't be a fractional value)
+                Dim GridPixelPos As New Point()
+
+                GridPixelPos.X = Int((InterrogationWindowSize.Width / 2) + GridX * Spacing.X)
+                If GridPixelPos.X < 0 Then GridPixelPos.X = 0
+                If GridPixelPos.X > (ImgA.Width - 1 - InterrogationWindowSize.Width / 2) Then GridPixelPos.X = (ImgA.Width - 1 - InterrogationWindowSize.Width / 2)
+
+                GridPixelPos.Y = Int((InterrogationWindowSize.Height / 2) + GridY * Spacing.Y)
+                If GridPixelPos.Y < 0 Then GridPixelPos.Y = 0
+                If GridPixelPos.Y > (ImgA.Height - 1 - InterrogationWindowSize.Height / 2) Then GridPixelPos.Y = (ImgA.Height - 1 - InterrogationWindowSize.Height / 2)
+
+                Dim SearchWindow(,) As ComplexDouble = CropArray(ImgArrayB, GridPixelPos, InterrogationWindowSize)
+                Dim Pattern(,) As ComplexDouble = CropArray(ImgArrayA, GridPixelPos, WindowSize)
+
+                Dim NormXCorrResult(,) As ComplexDouble = NormalizedCrossCorrelation(SearchWindow, Pattern)
+                NormXCorrResult = CropArray(NormXCorrResult, New Point(InterrogationWindowSize.Width / 2, InterrogationWindowSize.Height / 2), New Size(MaxVectorDisplacement.X * 2, MaxVectorDisplacement.Y * 2))
+
+                'Finds the maximum value position
+                Dim MaxAt As New Point
+                Dim M As Double = MaximumValue(NormXCorrResult, MaxAt)
+
+                MaxAt.X -= MaxVectorDisplacement.X - 1
+                MaxAt.Y -= MaxVectorDisplacement.Y - 1
+
+                'Adds this displacement to the map
+                ResultingVectors(GridX, GridY) = New VectorDisplacement(GridPixelPos.X, GridPixelPos.Y, MaxAt.X, MaxAt.Y)
+
+                'PictureDebug.ShowComplexDoubleArray(NormXCorrResult)
+            Next
+        Next
+
+        Return ResultingVectors
+
+    End Function
+
+    Public Function DrawVectorFieldOntoBMP(ByVal Image As Bitmap, VectorField(,) As VectorDisplacement, Scaling As Single, C As Color, Grid As Boolean, Optional GridColor As Color = Nothing) As Bitmap
+        'Draws lines onto the image with the vector sizes
+        Dim B As New Bitmap(Image)
+        Dim Canvas As Graphics = Graphics.FromImage(B)
+        Dim P As New Pen(C)
+        Dim PG As New Pen(GridColor)
+
+        For GridX As Integer = 0 To UBound(VectorField, 1)
+            Canvas.DrawLine(PG, VectorField(GridX, 0).PixelX, 0, VectorField(GridX, 0).PixelX, Image.Height)
+        Next
+
+        For Gridy As Integer = 0 To UBound(VectorField, 2)
+            Canvas.DrawLine(PG, 0, VectorField(0, Gridy).PixelY, Image.Height, VectorField(0, Gridy).PixelY)
+        Next
+
+        For GridX As Integer = 0 To UBound(VectorField, 1)
+            For GridY As Integer = 0 To UBound(VectorField, 2)
+                'Draws the vector
+                Canvas.DrawLine(P, VectorField(GridX, GridY).PixelX, VectorField(GridX, GridY).PixelY,
+                                VectorField(GridX, GridY).PixelX + Scaling * VectorField(GridX, GridY).DisplacementX, VectorField(GridX, GridY).PixelY + Scaling * VectorField(GridX, GridY).DisplacementY)
+
+            Next
+        Next
+
+        'Dim B As New Bitmap(Image.Width, Image.Height, Canvas)
+
+        Return B
+    End Function
+
+    Public Class VectorDisplacement
+        'Stores X,Y pixel coordinates of the displacement and their vectorial values.
+        Public PixelX As Integer
+        Public PixelY As Integer
+        Public DisplacementX As Single
+        Public DisplacementY As Single
+
+        Public Sub New(Px As Integer, Py As Integer, Dx As Single, Dy As Single)
+            Me.PixelX = Px
+            Me.PixelY = Py
+            Me.DisplacementX = Dx
+            Me.DisplacementY = Dy
+        End Sub
+    End Class
+#End Region
+
+
 #Region "Cross-Correlation"
+
     Public Function NormalizedCrossCorrelation(SearchWindow(,) As ComplexDouble, Template(,) As ComplexDouble) As ComplexDouble(,)
         'Tries to correlate the Template with the SearchWindow.
         'Returns an array of the size of the SearchWindow (which must be bigger than the Template)
@@ -75,7 +182,91 @@
 
         Return ResultArray
     End Function
+
+    Public Function CropArray(A(,) As ComplexDouble, C As Point, S As Size) As ComplexDouble(,)
+        'Returns a cropped (smaller) version of A(,)
+        'Centered in C and of window size of S
+        'Center in C means the center point is BEFORE C (between C-1 and C)
+        'Size MUST be even or rounding will occur
+        Dim XBegin As Integer = C.X - (S.Width / 2)
+        Dim XEnd As Integer = C.X + (S.Width / 2)
+
+        Dim YBegin As Integer = C.Y - (S.Height / 2)
+        Dim YEnd As Integer = C.Y + (S.Height / 2)
+
+        Try
+            Dim ResultArray(,) As ComplexDouble
+            ReDim ResultArray(XEnd - XBegin, YEnd - YBegin)
+
+            For X As Integer = XBegin To XEnd
+                For Y As Integer = YBegin To YEnd
+                    ResultArray(X - XBegin, Y - YBegin) = A(X, Y)
+                Next
+            Next
+
+            Return ResultArray
+        Catch ex As Exception
+            Throw New Exception("Out of bounds of the cropped array")
+        End Try
+
+    End Function
 #End Region
+
+
+#Region "Picture to Complex Array correlation"
+    Public Function BitmapToComplexArray(Bmp As Bitmap) As ComplexDouble(,)
+        'Converts a bitmap image into a complex number array
+        Dim ResultArray(,) As ComplexDouble
+        Dim Intensity As Double
+        ReDim ResultArray(Bmp.Width - 1, Bmp.Height - 1)
+
+        For X As Integer = 0 To Bmp.Width - 1
+            For Y As Integer = 0 To Bmp.Height - 1
+                Intensity = Bmp.GetPixel(X, Y).GetBrightness
+                ResultArray(X, Y) = New ComplexDouble(Intensity, 0)
+            Next
+        Next
+
+        Return ResultArray
+    End Function
+
+    Public Function ComplexArrayToBitmap(CArray(,) As ComplexDouble) As Bitmap
+        'Converts a bitmap image into a complex number array
+        Dim SizeX As Integer = UBound(CArray, 1) + 1
+        Dim SizeY As Integer = UBound(CArray, 2) + 1
+        Dim ResultBmp As New Bitmap(SizeX, SizeY)
+        Dim NormalizedIntensity As Double
+        Dim GrayscaleLevel As Integer
+        Dim M As Double
+        Dim MinimumMagnitude As Double = Double.MaxValue
+        Dim MaximumMagnitude As Double = Double.MinValue
+
+        For X As Integer = 0 To SizeX - 1
+            For Y As Integer = 0 To SizeY - 1
+                M = CArray(X, Y).Real
+                If MaximumMagnitude < M Then MaximumMagnitude = M
+                If MinimumMagnitude > M Then MinimumMagnitude = M
+            Next
+        Next
+
+        For X As Integer = 0 To SizeX - 1
+            For Y As Integer = 0 To SizeY - 1
+                If CArray(X, Y).Real = MaximumMagnitude Then
+                    ResultBmp.SetPixel(X, Y, Color.Red)
+                Else
+                    NormalizedIntensity = (CArray(X, Y).Real - MinimumMagnitude) / (MaximumMagnitude - MinimumMagnitude)
+                    GrayscaleLevel = Int(NormalizedIntensity * 255)
+
+                    ResultBmp.SetPixel(X, Y, Color.FromArgb(GrayscaleLevel, GrayscaleLevel, GrayscaleLevel))
+                End If
+            Next
+        Next
+
+        Return ResultBmp
+    End Function
+
+#End Region
+
 
 #Region "Filtering"
 
@@ -226,14 +417,20 @@
         Return Sum / ((UBound(M, 1) + 1) * (UBound(M, 2) + 1))
     End Function
 
-    Public Function MaximumValue(M(,) As ComplexDouble) As Double
+    Public Function MaximumValue(M(,) As ComplexDouble, ByRef Optional MaxAt As Point = Nothing) As Double
         'Returns the maximum value in the array
         Dim Max As Double = Double.MinValue
+        MaxAt = New Point
         For X As Integer = 0 To UBound(M, 1)
             For Y As Integer = 0 To UBound(M, 2)
-                If Max < M(X, Y).Real Then Max = M(X, Y).Real
+                If Max < M(X, Y).Real Then
+                    Max = M(X, Y).Real
+                    MaxAt.X = X
+                    MaxAt.Y = Y
+                End If
             Next
         Next
+
 
         MaximumValue = Max
     End Function
